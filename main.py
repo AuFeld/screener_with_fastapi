@@ -26,8 +26,12 @@ def get_db():
 @app.get("/")
 def dashboard(request: Request, forward_pe = None, dividend_yield = None, ma50 = None, ma200 = None, db: Session = Depends(get_db)):
     """
-    displays the stock screener dashboard / homepage
+    show all stocks in the db and button to add more
+    button next to each stock to delete from db
+    filters to filter this list of stocks
+    button next to each to add a note or save for later
     """
+
     stocks = db.query(Stock)
 
     if forward_pe:
@@ -42,6 +46,8 @@ def dashboard(request: Request, forward_pe = None, dividend_yield = None, ma50 =
     if ma200:
         stocks = stocks.filter(Stock.price > Stock.ma200)
 
+    stocks = stocks.all()
+
     return templates.TemplateResponse("dashboard.html", {
         "request": request,
         "stocks": stocks,
@@ -52,7 +58,9 @@ def dashboard(request: Request, forward_pe = None, dividend_yield = None, ma50 =
     }) 
 
 def fetch_stock_data(id: int):
+    
     db = SessionLocal()
+    
     stock = db.query(Stock).filter(Stock.id == id).first()
 
     
@@ -63,9 +71,7 @@ def fetch_stock_data(id: int):
     stock.price = yahoo_data.info['previousClose']
     stock.forward_pe = yahoo_data.info['forwardPE']
     stock.forward_eps = yahoo_data.info['forwardEps']
-    
-    if yahoo_data.info['dividendYield'] is not None:
-        stock.dividend_yield = yahoo_data.info['dividendYield'] * 100
+    stock.dividend_yield = yahoo_data.info['dividendYield'] * 100
 
     db.add(stock)
     db.commit()
@@ -73,11 +79,12 @@ def fetch_stock_data(id: int):
 @app.post("/stock")
 async def create_stock(stock_request: StockRequest, background_tasks: BackgroundTasks, db: Session = Depends(get_db)):
     """
-    creates a stock and stroes it in the database
+    add one or more tickers to the database
+    background task to use yfinance and load key statistics
     """
+    
     stock = Stock()
     stock.symbol = stock_request.symbol
-
     db.add(stock)
     db.commit()
 
